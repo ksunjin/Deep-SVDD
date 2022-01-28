@@ -2,9 +2,7 @@ import torch
 import numpy as np
 from torch.utils.data import Subset
 import torchvision.transforms as transforms
-
 from torchvision.datasets import ImageFolder
-
 
 def get_target_label_idx(labels, targets):
     """
@@ -40,35 +38,36 @@ def global_contrast_normalization(x: torch.tensor, scale='l2'):
 
     return x
 
-def min_max_cal():
+def min_max_print():
     train_transforms = transforms.Compose([
-        transforms.Resize(size=(128, 128)),
-        transforms.ToTensor()
+        transforms.ToTensor(),
+        transforms.Resize(size=(128,128))
     ])
-    train_set_full = ImageFolder(root='../../data/casting_data', transform=train_transforms)
+
+    train_set_full_c = MyImage(root='../../data/marble_data', transform=train_transforms)
 
     MIN = []
     MAX = []
+    for normal_classes in range(10):
 
-    for normal_classes in range(1):
-        #MNIST에서 get_target_label_idx 첫 번째 인자 type: numpy
-        train_idx_normal = get_target_label_idx(np.array(train_set_full.targets), normal_classes)
-        train_set = Subset(train_set_full, train_idx_normal)
-
-        print(train_set_full, train_idx_normal)
+        train_idx_normal = get_target_label_idx(train_set_full_c.targets, normal_classes)
+        train_set = Subset(train_set_full_c, train_idx_normal)
 
         _min_ = []
         _max_ = []
 
         for idx in train_set.indices:
-            #TODO train_set.dataset.data Attributeerror
-            gcm = global_contrast_normalization(train_set.dataset.data[idx], 'l1')
+            ndarr = train_set.dataset.train_data[idx]
+            tensor = torch.tensor(ndarr)
+            gcm = global_contrast_normalization(tensor, 'l1')
             _min_.append(gcm.min())
             _max_.append(gcm.max())
-        MIN.append(np.min(_min_))
-        MAX.append(np.max(_max_))
+        try:
+            MIN.append(np.min(_min_))
+            MAX.append(np.max(_max_))
+        except ValueError:
+            pass
     print(list(zip(MIN, MAX)))
-
 
 class MyImage(ImageFolder):
     def __init__(self, train=True, raw_transform=None, *args, **kwargs):
@@ -79,8 +78,8 @@ class MyImage(ImageFolder):
 
     def make_dataarray(self):
         arrl = []
-        for fpth,_ in self.imgs:
-            #print(self.loader(fpth))
+        for fpth, _ in self.imgs:
+            # print(self.loader(fpth))
             if self.raw_transform is not None:
                 arrl.append(self.raw_transform(self.loader(fpth)).detach().cpu().numpy()[np.newaxis])
             else:
@@ -90,6 +89,7 @@ class MyImage(ImageFolder):
             self.train_data = np.concatenate(arrl)
         else:
             self.test_data = np.concatenate(arrl)
+
     def __getitem__(self, index: int):
         path, target = self.samples[index]
         sample = self.loader(path)
@@ -100,5 +100,6 @@ class MyImage(ImageFolder):
 
         return sample, target, index
 
+
 if __name__ == '__main__':
-    min_max_cal()
+    min_max_print()
